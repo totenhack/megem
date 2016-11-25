@@ -84,7 +84,8 @@ void doCommand(char *command) {
       {
         kg_toggle = 1;
       }
-      break;/*
+      break;
+    /*
     // Beamer
     case 'b':
       beamer_toggle = !beamer_toggle;
@@ -92,7 +93,8 @@ void doCommand(char *command) {
     // Strang
     case 't':
       strang_toggle = !strang_toggle;
-      break; */
+      break;
+    */
   }
 }
 
