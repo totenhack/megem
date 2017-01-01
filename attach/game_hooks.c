@@ -5,12 +5,6 @@ int (__thiscall *UpdateCheckpoint)(int, int, char **);
 
 HOOK *hook_FrameFunc;
 
-#include <d3d9.h>
-#include <d3dx9.h>
-
-LPDIRECT3D9 d3d;
-LPDIRECT3DDEVICE9 *d3ddev;
-
 int __thiscall FrameFuncHook(int this, float frametime) {
   RemoveHook(hook_FrameFunc);
   int ret = FrameFunc(this, frametime);
