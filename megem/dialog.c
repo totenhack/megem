@@ -221,6 +221,66 @@ LRESULT CALLBACK setVelocityZProc(PROCARGS) {
   return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
+LRESULT CALLBACK setVelocityHProc(PROCARGS) {
+  char buffer[BUFSIZE];
+
+  if (msg == WM_COMMAND) {
+    switch(LOWORD(wParam)) {
+      case OKAY:
+        getInputVal(hWnd, buffer);
+        float speed = kmhToV(atof(buffer));
+        float vx = intToFloat(getGameValue(D_VELOCITY_X)),
+              vz = intToFloat(getGameValue(D_VELOCITY_Z));
+
+        float rx;
+
+        if (vx + vz == 0) {
+          rx = gameRotToDeg(getGameValue(D_ROTATION_X)) * PI / 180;
+        } else {
+          rx = atan2(vz, vx);
+          rx = (rx > 0 ? rx : ((float)2 * PI + rx)) * (float)360 / (2 * PI);
+          rx *= PI / 180;
+        }
+
+        setGameValue(D_VELOCITY_X, floatToInt(speed * cos(rx)));
+        setGameValue(D_VELOCITY_Z, floatToInt(speed * sin(rx)));
+      case CANCEL:
+        DestroyWindow(hWnd);
+        break;
+    }
+  } else if (msg == WM_CREATE) {
+    float x = intToFloat(getGameValue(D_VELOCITY_X)),
+          z = intToFloat(getGameValue(D_VELOCITY_Z));
+
+    sprintf(buffer, "%f", vToKmh(getVectorDist(x, z)));
+    SetWindowText(GetDlgItem(hWnd, INPUT), buffer);
+  }
+
+  return DefWindowProc(hWnd, msg, wParam, lParam);
+}
+
+LRESULT CALLBACK setVelocityVProc(PROCARGS) {
+  char buffer[BUFSIZE];
+
+  if (msg == WM_COMMAND) {
+    switch(LOWORD(wParam)) {
+      case OKAY:
+        getInputVal(hWnd, buffer);
+        setGameValue(D_VELOCITY_Y, floatToInt(kmhToV(atof(buffer))));
+      case CANCEL:
+        DestroyWindow(hWnd);
+        break;
+    }
+  } else if (msg == WM_CREATE) {
+    float y = vToKmh(intToFloat(getGameValue(D_VELOCITY_Y)));
+
+    sprintf(buffer, "%f", y);
+    SetWindowText(GetDlgItem(hWnd, INPUT), buffer);
+  }
+
+  return DefWindowProc(hWnd, msg, wParam, lParam);
+}
+
 LRESULT CALLBACK setRotationXProc(PROCARGS) {
   char buffer[BUFSIZE];
 

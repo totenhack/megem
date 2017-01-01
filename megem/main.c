@@ -25,7 +25,7 @@ typedef struct {
 } STATE;
 
 struct {
-  int attached, godmode_toggle, floatmode_toggle;
+  int attached;
   HANDLE handle;
   DWORD id;
   HANDLE pipe;
@@ -37,34 +37,36 @@ struct {
 
 static char keys[256];
 static int keybinds[256];
-short FORWARD, BACKWARD, LEFT, RIGHT, UP, DOWN;
 
 #include "util.c"
 #include "process.c"
 #include "pipe.c"
 #include "game.c"
 #include "window.c"
+#include "animation.c"
 
 void setup();
 void setupKeybinds();
 
 int main(int argc, char *argv[]) {
-  // FreeConsole();
+  FreeConsole();
 
   if (getProcessIdByName("megem.exe") != GetCurrentProcessId()) {
+    printf("Megem already found running\nExiting");
     return 1;
   }
+
+  setPipeValue("god", "%d", 0);
+  setPipeValue("float", "%d", 0);
 
   setupKeybinds();
 
   CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)windowMain, NULL, 0, NULL);
 
-  process.attached = process.godmode_toggle = 0;
-
   for (;;) {
     process.id = getGameProcessId();
 
-    if (process.id != -1) {
+    if (process.id != -1 && getGameThreadCount() >= 20) {
       setup();
     } else {
       process.attached = 0;
@@ -72,6 +74,12 @@ int main(int argc, char *argv[]) {
 
     Sleep(5000);
   }
+}
+
+void cleanExit() {
+  UnhookWindowsHookEx(process.keyboard_hook);
+  setProcessSpeed(1);
+  exit(0);
 }
 
 void update() {
@@ -85,44 +93,7 @@ void update() {
     copyState(&process.current, &process.last_ground);
   }
 
-  if (process.godmode_toggle) {
-    setGameValue(D_HEALTH, 100);
-    setGameValue(D_FALL_Y, floatToInt(-2147483647));
-  }
-
-  if (process.floatmode_toggle) {
-    float s = 30;
-    float rx = gameRotToDeg(process.current.rx);
-
-    process.float_state.vx = process.float_state.vz = 0;
-
-    if (keys[FORWARD]) {
-      process.float_state.vx = cos(rx * PI / 180) * s;
-      process.float_state.vz = sin(rx * PI / 180) * s;
-    } else if (keys[BACKWARD]) {
-      process.float_state.vx = -cos(rx * PI / 180) * s;
-      process.float_state.vz = -sin(rx * PI / 180) * s;
-    }
-
-    if (keys[LEFT]) {
-      process.float_state.vx += cos((rx - 90) * PI / 180) * s;
-      process.float_state.vz += sin((rx - 90) * PI / 180) * s;
-    } else if (keys[RIGHT]) {
-      process.float_state.vx += cos((rx + 90) * PI / 180) * s;
-      process.float_state.vz += sin((rx + 90) * PI / 180) * s;
-    }
-
-    if (keys[UP]) {
-      process.float_state.vy = s;
-    } else if (keys[DOWN]) {
-      process.float_state.vy = -s;
-    } else {
-      process.float_state.vy = 0;
-    }
-
-    setVelocity(0, 0, 0);
-    setGameValue(D_STATE, GROUNDED - 1);
-    setGameValue(D_FALL_Y, floatToInt(-2147483647));
+  if (dGetPipeValue("float")) {
     SetTextColor(process.hdc, RGB(255, 0, 0));
   }
 
@@ -148,7 +119,7 @@ void update() {
   drawText(process.hdc, 0, 240, " ry %f",
            gameRotToDeg(process.current.ry));
 
-  if (process.godmode_toggle) {
+  if (dGetPipeValue("god")) {
     SetTextColor(process.hdc, RGB(255, 0, 0));
   }
 
@@ -165,41 +136,32 @@ void update() {
 }
 
 void setupKeybinds() {
+  static int length = sizeof(KEYS) / sizeof(KEY);
+
   memset(&keybinds, -1, 256 * sizeof(int));
 
   FILE *file = fopen("keybinds.dat", "r");
 
-  char buffer[BUFSIZE];
-  int t;
-  while (fscanf(file, "%s 0x%02x\n", &buffer, &t) >= 0) {
-    int i;
-    for (i = 0; i < M_COUNT + 5; i++) {
-      if (strcmp(buffer, actions[i]) == 0) {
+  char action[BUFSIZE];
+  char key[BUFSIZE];
+
+  while (fscanf(file, "%s %s\n", &action, &key) >= 0) {
+    short keycode = 0;
+    for (int i = 0; i < length; i++) {
+      if (strcmp(key, KEYS[i].name) == 0) {
+        keycode = KEYS[i].code;
         break;
       }
     }
 
-    keybinds[t] = i;
+    if (!keycode) {
+      continue;
+    }
 
-    if (i >= M_COUNT) {
-      switch (M_COUNT + 6 - i) {
-        case 6:
-          FORWARD = t;
-          break;
-        case 5:
-          BACKWARD = t;
-          break;
-        case 4:
-          LEFT = t;
-          break;
-        case 3:
-          RIGHT = t;
-          break;
-        case 2:
-          UP = t;
-          break;
-        case 1:
-          DOWN = t;
+    for (int i = 0; i < M_COUNT + 6; i++) {
+      if (strcmp(action, actions[i]) == 0) {
+        keybinds[keycode] = i;
+        break;
       }
     }
   }
@@ -208,16 +170,62 @@ void setupKeybinds() {
 }
 
 LRESULT CALLBACK keyboardHook(int code, WPARAM wParam, LPARAM lParam) {
-  if (code >= 0 && isGameWindow(GetForegroundWindow())) {
+  if (code >= 0) {
     KBDLLHOOKSTRUCT data = *((KBDLLHOOKSTRUCT *)lParam);
     short keycode = data.vkCode;
 
-    if (wParam == WM_KEYDOWN && !keys[keycode]) {
+    if (wParam == WM_KEYDOWN && !keys[keycode] &&
+        isGameWindow(GetForegroundWindow()))
+    {
       keys[keycode] = 1;
 
       SendMessage(process.hWnd, WM_COMMAND, keybinds[keycode], 0);
+
+      if (keybinds[keycode] >= M_COUNT) {
+        switch (M_COUNT + 6 - keybinds[keycode]) {
+          case 6:
+            setPipeValue("forward", "%d", 1);
+            break;
+          case 5:
+            setPipeValue("backward", "%d", 1);
+            break;
+          case 4:
+            setPipeValue("left", "%d", 1);
+            break;
+          case 3:
+            setPipeValue("right", "%d", 1);
+            break;
+          case 2:
+            setPipeValue("up", "%d", 1);
+            break;
+          case 1:
+            setPipeValue("down", "%d", 1);
+        }
+      }
     } else if (wParam == WM_KEYUP && keys[keycode]) {
       keys[keycode] = 0;
+
+      if (keybinds[keycode] >= M_COUNT) {
+        switch (M_COUNT + 6 - keybinds[keycode]) {
+          case 6:
+            setPipeValue("forward", "%d", 0);
+            break;
+          case 5:
+            setPipeValue("backward", "%d", 0);
+            break;
+          case 4:
+            setPipeValue("left", "%d", 0);
+            break;
+          case 3:
+            setPipeValue("right", "%d", 0);
+            break;
+          case 2:
+            setPipeValue("up", "%d", 0);
+            break;
+          case 1:
+            setPipeValue("down", "%d", 0);
+        }
+      }
     }
   }
 
@@ -248,6 +256,6 @@ void setup() {
 
   if (!process.attached) {
     process.attached = 1;
-    printf("Attached Successfully\n");
+    printf("Attached successfully\n");
   }
 }

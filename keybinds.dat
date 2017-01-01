@@ -1,0 +1,14 @@
+god 0
+float 2
+gadvance 3
+gunpause 6
+save0 4
+load0 5
+kg e
+forward w
+backward s
+left a
+right d
+up space
+down lshift
+reactiontime t

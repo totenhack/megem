@@ -1,58 +1,76 @@
-HOOK *qpc_hook;
-HOOK *gtc_hook;
+int (WINAPI *oQueryPerformanceCounter)(LARGE_INTEGER *);
+DWORD (WINAPI *oGetTickCount)();
 
-int (WINAPI *oQPC)(LARGE_INTEGER *);
+int WINAPI hQueryPerformanceCounter(LARGE_INTEGER *);
+DWORD WINAPI hGetTickCount();
 
-LARGE_INTEGER qpc_initial, qpc_offset, qpf;
+void setSpeed(float);
+void loop();
 
-float speed = 1;
+struct {
+  LONGLONG initial, offset;
+} QPC;
 
-int WINAPI hQPC(LARGE_INTEGER *o) {
-  LARGE_INTEGER current;
-  int ret = oQPC(&current);
-  o->QuadPart = qpc_offset.QuadPart +
-                ((current.QuadPart - qpc_initial.QuadPart) * speed);
+struct {
+  DWORD initial, offset;
+} GTC;
 
-  return ret;
+float speed_multiplier = 1;
+
+void initSpeedMod() {
+  HANDLE kernel32 = GetModuleHandleA("kernel32.dll");
+
+  void *qpcAddr = GetProcAddress(kernel32, "QueryPerformanceCounter");
+  void *gtcAddr = GetProcAddress(kernel32, "GetTickCount");
+
+  oQueryPerformanceCounter = NewGate(0);
+  oGetTickCount = NewGate(4);
+
+  StaticTrampolineHook(qpcAddr, &hQueryPerformanceCounter,
+                       oQueryPerformanceCounter, 0);
+  StaticTrampolineHook(gtcAddr, &hGetTickCount, oGetTickCount, 4);
+
+  setSpeed(1);
 }
 
-DWORD WINAPI hGTC() {
-  LARGE_INTEGER current;
-  QueryPerformanceCounter(&current);
+void setSpeed(float speed) {
+  GTC.offset = GetTickCount();
+  GTC.initial = oGetTickCount();
 
-  return (current.QuadPart * 1000) / qpf.QuadPart;
-}
+  LARGE_INTEGER t;
+  QueryPerformanceCounter(&t);
+  QPC.offset = t.QuadPart;
 
-void setSpeed(float s) {
-  QueryPerformanceFrequency(&qpf);
+  oQueryPerformanceCounter(&t);
+  QPC.initial = t.QuadPart;
 
-  QueryPerformanceCounter(&qpc_offset);
-  oQPC(&qpc_initial);
+  speed_multiplier = speed;
 
-  speed = s;
   setPipeValue("speed", "%f", speed);
 }
 
 void advanceFrame() {
-  if (speed != 0) {
+  if (speed_multiplier != 0) {
     setSpeed(0);
   }
 
-  qpc_offset.QuadPart += (17 * qpf.QuadPart) / 1000;
+  LARGE_INTEGER qpf;
+  QueryPerformanceFrequency(&qpf);
+
+  QPC.offset += (60 * qpf.QuadPart) / 1000;
+  GTC.offset += 60;
 }
 
-void initSpeedMod() {
-  void *qpcAddr = (void *)GetProcAddress(GetModuleHandle("Kernel32.dll"),
-                                         "QueryPerformanceCounter");
-  qpc_hook = newHook(qpcAddr, hQPC, 0);
-  oQPC = qpc_hook->copy;
+int WINAPI hQueryPerformanceCounter(LARGE_INTEGER *out) {
+  LARGE_INTEGER current;
+  int ret = oQueryPerformanceCounter(&current);
 
-  void *gtcAddr = (void *)GetProcAddress(GetModuleHandle("Kernel32.dll"),
-                                         "GetTickCount");
-  gtc_hook = newHook(gtcAddr, hGTC, 0);
+  out->QuadPart =
+      ((current.QuadPart - QPC.initial) * speed_multiplier) + QPC.offset;
 
-  setSpeed(1);
+  return ret;
+}
 
-  applyHook(qpc_hook);
-  applyHook(gtc_hook);
+DWORD WINAPI hGetTickCount() {
+  return ((oGetTickCount() - GTC.initial) * speed_multiplier) + GTC.offset;
 }

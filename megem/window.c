@@ -6,6 +6,8 @@
 #define KEYUP 1
 
 LRESULT CALLBACK windowProc(HWND, UINT, WPARAM, LPARAM);
+void reactionTime();
+void cleanExit();
 void update();
 LRESULT CALLBACK keyboardHook(int, WPARAM, LPARAM);
 
@@ -53,12 +55,6 @@ int windowMain() {
   }
 }
 
-void cleanExit() {
-  UnhookWindowsHookEx(process.keyboard_hook);
-  setProcessSpeed(1);
-  exit(0);
-}
-
 LRESULT CALLBACK windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   unsigned int menu = LOWORD(wParam);
 
@@ -88,6 +84,9 @@ LRESULT CALLBACK windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
           break;
         case M_FOCUS:
           focusGame();
+          break;
+        case M_PROCESS_EXIT:
+          sendPipeMessage("e");
           break;
         case M_SUSPEND:
           suspendGame();
@@ -127,6 +126,12 @@ LRESULT CALLBACK windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
           break;
         case M_VELOCITY_Z:
           dialog(hWnd, "Velocity Z", setVelocityZProc);
+          break;
+        case M_VELOCITY_H:
+          dialog(hWnd, "Velocity H", setVelocityHProc);
+          break;
+        case M_VELOCITY_V:
+          dialog(hWnd, "Velocity V", setVelocityVProc);
           break;
         case M_ROTATION_X:
           dialog(hWnd, "Rotation X", setRotationXProc);
@@ -212,25 +217,27 @@ LRESULT CALLBACK windowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
           checkMenu(hWnd, menu);
 
           if (isMenuChecked(hWnd, menu)) {
-            process.godmode_toggle = 1;
+            setPipeValue("god", "%d", 1);
           } else {
-            process.godmode_toggle = 0;
+            setPipeValue("god", "%d", 0);
           }
           break;
         case M_FLOAT_MODE:
           checkMenu(hWnd, menu);
 
           if (isMenuChecked(hWnd, menu)) {
-            setVelocity(0, 0, 0);
-            saveState(&process.float_state);
-            CreateThread(0, 0,(LPTHREAD_START_ROUTINE)floatMode, 0, 0, 0);
-            process.floatmode_toggle = 1;
+            sendPipeMessage("f");
+            setPipeValue("float", "%d", 1);
           } else {
-            process.floatmode_toggle = 0;
+            setPipeValue("float", "%d", 0);
+            setGameValue(D_STATE, IN_AIR);
           }
           break;
         case M_KG:
           sendPipeMessage("k");
+          break;
+        case M_REACTION_TIME:
+          reactionTime();
           break;
       }
 

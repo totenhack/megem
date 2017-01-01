@@ -17,3 +17,29 @@ void setPipeValue(char *name, const char *format, ...) {
   fprintf(file, "%s", buffer);
   fclose(file);
 }
+
+void getPipeValue(char *name, char *out) {
+  char path[MAX_PATH];
+  unsigned int length = GetTempPath(MAX_PATH, path);
+  strcpy(path + length, EXTENSION);
+  strcpy(path + strlen(path), name);
+
+  FILE *file = fopen(path, "r");
+  fscanf(file, "%s", out);
+  fclose(file);
+}
+
+int dGetPipeValue(char *name) {
+  char out[BUFSIZE];
+  getPipeValue(name, out);
+
+  return atoi(out);
+}
+
+
+float fGetPipeValue(char *name) {
+  char out[BUFSIZE];
+  getPipeValue(name, out);
+
+  return atof(out);
+}

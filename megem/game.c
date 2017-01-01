@@ -15,7 +15,7 @@ enum {
 };
 
 DWORD DATA[][6] = {
-  { 0x1BFBB70, 0x2FC, 0x9C,  0xC2C, 0x00,  0x00  }, // Game Speed
+  { 0x1BFBB70, 0x1C,  0x9C,  0xC2C, 0x00,  0x00  }, // Game Speed
   { 0x1C553D0, 0xCC,  0x1D4, 0x70,  0x624, 0xE8  }, // Position x
   { 0x1C553D0, 0xCC,  0x1D4, 0x70,  0x624, 0xF0  }, // Position y
   { 0x1C553D0, 0xCC,  0x1D4, 0x70,  0x624, 0xEC  }, // Position z
@@ -24,11 +24,12 @@ DWORD DATA[][6] = {
   { 0x1B73F1C, 0xCC,  0x4A4, 0x214, 0x104, 0x0   }, // Velocity z
   { 0x1B73F1C, 0xCC,  0x70,  0xF8,  0x00,  0x00  }, // Rotation x
   { 0x1B73F1C, 0xCC,  0x70,  0xF4,  0x00,  0x00  }, // Rotation y
-  { 0x1C4C6FC, 0x78C, 0x780, 0x40,  0x2F8, 0x68  }, // State
+  { 0x1B73F1C, 0xCC,  0x4A4, 0x214, 0x98,  0x68  }, // State
   { 0x1C553D0, 0xCC,  0x1D4, 0x70,  0x1C0, 0x72C }, // Fall Height
   { 0x1C553D0, 0xCC,  0x1CC, 0x304, 0x2B8, 0x00  }, // Health
-  { 0x1BFBB70, 0x2A4, 0x9C,  0xC54, 0x00,  0x00  } // Paused
+  { 0x1BFBB70, 0x3C,  0x9C,  0xC54, 0x00,  0x00  } // Paused
 };
+
 #define GROUNDED 100860161
 #define IN_AIR 100860162
 #define WALLRUN 100860172
@@ -179,6 +180,7 @@ void loadState(STATE *state) {
   setVelocity(state->vx, state->vy, state->vz);
   setRotation(state->rx, state->ry);
   setGameValue(D_FALL_Y, floatToInt(state->fy));
+  setGameValue(D_HEALTH, state->health);
 }
 
 void appendStateToFile(FILE *file, STATE *state) {
@@ -211,8 +213,16 @@ void saveStateFile(char *path) {
   fclose(file);
 }
 
-void loadStateFile(char *path) {
-  if (access(path, F_OK) == -1) {
+void loadStateFile(char *output) {
+  char path[MAX_PATH]; // Save the state in the temp file
+  unsigned int length = GetTempPath(MAX_PATH, path);
+  strcpy(path + length, "megem_temp.medat\0");
+
+  CopyFile(output, path, 0);
+
+  sendPipeMessage("l");
+
+  /* if (access(path, F_OK) == -1) {
     return;
   }
 
@@ -244,6 +254,49 @@ void loadStateFile(char *path) {
       Sleep(1);
     }
 
+    SendMessage(getGameWindow(), WM_KEYDOWN, VK_SPACE, 0);
+    SendMessage(getGameWindow(), WM_KEYUP, VK_SPACE, 0);
+
+    while (getGameValue(D_STATE) == GROUNDED) {
+      if (timeGetTime() > start + 250) {
+        return loadState(&state);
+      }
+
+      Sleep(1);
+    }
+
+    loadState(&before);
+
+    /* before.x -= before.vx * 0.1;
+    before.y += 10;
+    before.z -= before.vz * 0.1;
+    before.state = IN_AIR;
+
+    while (getGameValue(D_STATE) != WALLRUN) {
+      if (timeGetTime() > start + 250) {
+        return loadState(&state);
+      }
+
+      Sleep(1);
+    }
+
+    setGameValue(D_FALL_Y, -2147483647);
+    setRotation(before.rx, before.ry);
+    setPosition(state.x, state.y, state.z); */
+
+    /* ground.state = IN_AIR;
+    ground.vy = ground.vx = ground.vz = 0;
+    ground.fy = -2147483647;
+    loadState(&ground);
+
+    while (getGameValue(D_STATE) != GROUNDED) {
+      if (timeGetTime() > start + 250) {
+        return loadState(&state);
+      }
+
+      Sleep(1);
+    }
+
     ground.rx = before.rx;
     ground.ry = before.ry;
     ground.vx = before.vx;
@@ -263,8 +316,8 @@ void loadStateFile(char *path) {
     }
 
     setGameValue(D_FALL_Y, -2147483647);
-    setPosition(before.x, before.y, before.z);
     setRotation(before.rx, before.ry);
+    setPosition(before.x, before.y, before.z);
 
     while (getGameValue(D_STATE) != WALLRUN) {
       if (timeGetTime() > start + 250) {
@@ -277,13 +330,13 @@ void loadStateFile(char *path) {
     state.state = IN_AIR;
   }
 
-  loadState(&state);
+  loadState(&state); */
 }
 
 void saveStateSlot(int slot) {
   char path[MAX_PATH];
   unsigned int length = GetTempPath(MAX_PATH, path);
-  strcpy(path + length, "save_\0");
+  strcpy(path + length, "megem_save_\0");
   sprintf(path + strlen(path), "%d.medat", slot);
 
   saveStateFile(path);
@@ -292,10 +345,10 @@ void saveStateSlot(int slot) {
 void loadStateSlot(int slot) {
   char *path = (char *)malloc(MAX_PATH);
   unsigned int length = GetTempPath(MAX_PATH, path);
-  strcpy(path + length, "save_\0");
+  strcpy(path + length, "megem_save_\0");
   sprintf(path + strlen(path), "%d.medat", slot);
 
-  CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)loadStateFile, path, 0, NULL);
+  loadStateFile(path);
 }
 
 int isGameWindow(HWND hWnd) {
@@ -369,23 +422,25 @@ int resumeGame() {
   return 1;
 }
 
-float getVectorDist(float vx, float vz) {
-  return sqrt(vx * vx + vz * vz);
-}
+int getGameThreadCount() {
+  THREADENTRY32 entry = { .dwSize = sizeof(THREADENTRY32) };
+  HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+  DWORD pid = getGameProcessId();
+  int count = 0;
 
-void floatMode() {
-  while (process.floatmode_toggle) {
-    process.float_state.x += process.float_state.vx;
-    process.float_state.y += process.float_state.vy;
-    process.float_state.z += process.float_state.vz;
-
-    setPosition(process.float_state.x, process.float_state.y,
-                process.float_state.z);
-
-    Sleep(10);
+  if (Thread32First(snapshot, &entry)) {
+    do {
+      if (entry.th32OwnerProcessID == pid) {
+        count++;
+      }
+    } while(Thread32Next(snapshot, &entry));
   }
 
-  setGameValue(D_STATE, IN_AIR);
-  setVelocity(process.float_state.vx * 100, process.float_state.vy * 100,
-              process.float_state.vz * 100);
+  CloseHandle(snapshot);
+
+  return count;
+}
+
+float getVectorDist(float vx, float vz) {
+  return sqrt(vx * vx + vz * vz);
 }

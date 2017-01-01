@@ -8,6 +8,7 @@ char actions[][256] = {
   "states",
   "exit",
   "focus",
+  "pexit",
   "psuspend",
   "presume",
   "ppause",
@@ -24,6 +25,8 @@ char actions[][256] = {
   "vx",
   "vy",
   "vz",
+  "hv",
+  "vv",
   "rx",
   "ry",
   "save0",
@@ -51,6 +54,7 @@ char actions[][256] = {
   "god",
   "float",
   "kg",
+  "reactiontime",
   "forward",
   "backward",
   "left",
@@ -64,6 +68,7 @@ enum {
   M_STATES,
   M_EXIT,
   M_FOCUS,
+  M_PROCESS_EXIT,
   M_SUSPEND,
   M_RESUME,
   M_PROCESS_PAUSE,
@@ -80,6 +85,8 @@ enum {
   M_VELOCITY_X,
   M_VELOCITY_Y,
   M_VELOCITY_Z,
+  M_VELOCITY_H,
+  M_VELOCITY_V,
   M_ROTATION_X,
   M_ROTATION_Y,
   M_SAVE_0,
@@ -107,6 +114,7 @@ enum {
   M_GOD_MODE,
   M_FLOAT_MODE,
   M_KG,
+  M_REACTION_TIME,
   M_COUNT
 };
 
@@ -131,6 +139,7 @@ void menuMain(HWND hWnd) {
 
   // Process
   AppendMenu(process, MF_STRING, M_FOCUS, "Focus");
+  AppendMenu(process, MF_STRING, M_PROCESS_EXIT, "Exit");
   AppendMenu(process, MF_SEPARATOR, 0, 0);
   AppendMenu(process, MF_STRING, M_SUSPEND, "Suspend");
   AppendMenu(process, MF_STRING, M_RESUME, "Resume");
@@ -157,6 +166,8 @@ void menuMain(HWND hWnd) {
   AppendMenu(velocity, MF_STRING, M_VELOCITY_X, "X");
   AppendMenu(velocity, MF_STRING, M_VELOCITY_Y, "Y");
   AppendMenu(velocity, MF_STRING, M_VELOCITY_Z, "Z");
+  AppendMenu(velocity, MF_STRING, M_VELOCITY_H, "H");
+  AppendMenu(velocity, MF_STRING, M_VELOCITY_V, "V");
   AppendMenu(player, MF_POPUP, (UINT_PTR)velocity, "Velocity");
   AppendMenu(rotation, MF_STRING, M_ROTATION_X, "X");
   AppendMenu(rotation, MF_STRING, M_ROTATION_Y, "Y");
@@ -183,6 +194,7 @@ void menuMain(HWND hWnd) {
   AppendMenu(tools, MF_POPUP, (UINT_PTR)M_FLOAT_MODE, "Float Mode");
   AppendMenu(tools, MF_SEPARATOR, 0, 0);
   AppendMenu(tools, MF_POPUP, (UINT_PTR)M_KG, "Kick Glitch");
+  AppendMenu(tools, MF_POPUP, (UINT_PTR)M_REACTION_TIME, "Reaction Time");
 
   // Append sub-menus to main menu
 
