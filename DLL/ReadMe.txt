@@ -1,1 +1,0 @@
-The DLL injected into Mirror's Edge.

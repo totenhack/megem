@@ -1,23 +1,23 @@
 #include "stdafx.h"
 
-SPLINE spline_create(int set_count, double *sets) {
-	if (set_count <= 0) return { 0 };
+SPLINE spline_create(unsigned int set_count, double *sets) {
+	if (set_count <= 0) return{ 0 };
 
 	double *variables = (double *)malloc((set_count * set_count) * sizeof(double));
 	double *constants = (double *)malloc(set_count * sizeof(double));
 
-	for (int i = 0, s = 0; i < set_count; i++) {
+	for (unsigned int i = 0, s = 0; i < set_count; i++) {
 		double x = sets[s++];
 
-		for (int e = 0, b = i * set_count; e < set_count; e++) {
-			variables[b + e] = pow(x, e + 1);
+		for (unsigned int e = 0, b = i * set_count; e < set_count; e++) {
+			variables[b + e] = pow(x, e);
 		}
 
 		constants[i] = sets[s++];
 	}
 
-	MATRIX variable_matrix = { set_count, set_count, variables };
-	MATRIX constant_matrix = { set_count, 1, constants };
+	MATRIX variable_matrix = { (int)set_count, (int)set_count, variables };
+	MATRIX constant_matrix = { (int)set_count, 1, constants };
 
 	MATRIX inverse = matrix_inverse(&variable_matrix);
 	free(variables);
@@ -26,17 +26,25 @@ SPLINE spline_create(int set_count, double *sets) {
 	free(inverse.matrix);
 	free(constants);
 
-	return { variable_matrix.rows, variable_matrix.matrix };
+	return{ (unsigned int)variable_matrix.rows, variable_matrix.matrix };
 }
 
 double spline_get(SPLINE *spline, double x) {
 	double r = 0;
 
-	for (int i = 0; i < spline->degree; i++) {
-		r += pow(x, i + 1) * spline->equation[i];
+	for (unsigned int i = 0; i < spline->degree; i++) {
+		r += pow(x, i) * spline->equation[i];
 	}
 
 	return r;
+}
+
+void spline_print(SPLINE *spline) {
+	printf("y = ");
+	for (unsigned int i = 0; i < spline->degree; i++) {
+		printf("%lfx^%d + ", spline->equation[i], i);
+	}
+	printf("\b\b \n");
 }
 
 void matrix_print(MATRIX *m) {
@@ -54,7 +62,7 @@ void matrix_print(MATRIX *m) {
 }
 
 MATRIX matrix_identity(MATRIX *m) {
-	if (m->rows != m->columns) return { 0, 0, 0 };
+	if (m->rows != m->columns) return{ 0, 0, 0 };
 
 	MATRIX r;
 	r.rows = r.columns = m->rows;
@@ -72,7 +80,7 @@ MATRIX matrix_identity(MATRIX *m) {
 }
 
 MATRIX matrix_multiply(MATRIX *m1, MATRIX *m2) {
-	if (m1->columns != m2->rows) return { 0, 0, 0 };
+	if (m1->columns != m2->rows) return{ 0, 0, 0 };
 
 	MATRIX m;
 	m.rows = m1->rows;
@@ -97,7 +105,7 @@ MATRIX matrix_multiply(MATRIX *m1, MATRIX *m2) {
 MATRIX matrix_inverse(MATRIX *m) {
 	double *identity = matrix_identity(m).matrix;
 	if (!identity) {
-		return { 0, 0, 0 };
+		return{ 0, 0, 0 };
 	}
 
 	int size = m->rows;
@@ -141,6 +149,6 @@ MATRIX matrix_inverse(MATRIX *m) {
 
 	free(identity);
 
-	return { size, size, matrix };
+	return{ size, size, matrix };
 }
 

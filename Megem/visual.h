@@ -1,5 +1,7 @@
 #pragma once
 
+#define PROPERTIES_ENGINE_START 6
+
 typedef enum {
 	TYPE_INT, TYPE_FLOAT
 } TYPE;
@@ -11,6 +13,12 @@ typedef struct {
 } PROPERTY;
 
 static PROPERTY visual_properties[] = {
+	{ "DOF Intensity", 0x70, TYPE_FLOAT },
+	{ "DOF Feather", 0x64, TYPE_FLOAT },
+	{ "DOF Samples", 0x68, TYPE_FLOAT },
+	{ "DOF Focus", 0x8C, TYPE_FLOAT },
+	{ "DOF Creep", 0x84, TYPE_FLOAT },
+	{ "DOF Glow", 0xA0, TYPE_FLOAT },
 	{ "Saturation", 0x258, TYPE_FLOAT },
 	{ "Blue Tint", 0x25C, TYPE_FLOAT },
 	{ "Pink Tint", 0x260, TYPE_FLOAT },

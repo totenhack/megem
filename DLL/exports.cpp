@@ -1,108 +1,71 @@
 #include "stdafx.h"
 
-static DOLLY *dolly = NewDolly();
-
-EXPORT void EXPORT_ResetDolly() {
-	SetFOV(90);
-
-	if (dolly) {
-		StopDolly();
-		FreeDolly(dolly);
-	}
-
-	dolly = NewDolly();
+EXPORT void EXPORT_GetDataBase(DWORD *base) {
+	*base = (DWORD)GetData();
 }
 
-EXPORT void EXPORT_SetDollyDOF(float *dof) {
-	dolly->dof = *dof;
-	FREE(dof);
+EXPORT void EXPORT_SetProcessSpeed(float *speed) {
+	SetProcessSpeed(*speed);
 }
 
-EXPORT void EXPORT_SetDollyDuration(int *duration) {
-	dolly->duration = *duration;
-	FREE(duration);
+EXPORT void EXPORT_EnableRendering() {
+	EnableRendering();
 }
 
-EXPORT void EXPORT_AddDollyMarker() {
-	AddMarker(dolly);
+EXPORT void EXPORT_DisableRendering() {
+	DisableRendering();
 }
 
-EXPORT void EXPORT_PlayDolly() {
-	StopDolly();
-	PlayDolly(dolly);
-}
-
-EXPORT void EXPORT_EnableFloatIncrease() {
-	SetFloatIncrease(true);
-}
-
-EXPORT void EXPORT_DisableFloatIncrease() {
-	SetFloatIncrease(false);
-}
-
-EXPORT void EXPORT_EnableFloatDecrease() {
-	SetFloatDecrease(true);
-}
-
-EXPORT void EXPORT_DisableFloatDecrease() {
-	SetFloatDecrease(false);
+EXPORT void EXPORT_KG() {
+	if (!Loading()) KG(true);
 }
 
 EXPORT void EXPORT_Strang() {
-	Strang(true);
+	if (!Loading()) Strang(true);
 }
 
-EXPORT void EXPORT_StopStrang() {
+EXPORT void EXPORT_Beamer() {
+	if (!Loading()) Beamer(true);
+}
+
+EXPORT void EXPORT_GodOn() {
+	God(true);
+}
+
+EXPORT void EXPORT_GodOff() {
+	God(false);
+}
+
+EXPORT void EXPORT_FloatOn() {
+	Float(true);
+}
+
+EXPORT void EXPORT_FloatOff() {
+	Float(false);
+}
+
+EXPORT void EXPORT_OpenDebugConsole() {
+	OpenDebugConsole();
+}
+
+EXPORT void EXPORT_CloseDebugConsole() {
+	CloseDebugConsole();
+}
+
+EXPORT void EXPORT_DisableAll() {
+	KG(false);
+	Beamer(false);
 	Strang(false);
-}
-
-EXPORT void EXPORT_KickGlitch() {
-	KickGlitch(true);
-}
-
-EXPORT void EXPORT_StopKickGlitch() {
-	KickGlitch(false);
-}
-
-EXPORT void EXPORT_EnableGodMode() {
-	ToggleGodMode(true);
-}
-
-EXPORT void EXPORT_DisableGodMode() {
-	ToggleGodMode(false);
-}
-
-EXPORT void EXPORT_EnableFloatMode() {
-	ToggleFloatMode(true);
-}
-
-EXPORT void EXPORT_DisableFloatMode() {
-	ToggleFloatMode(false);
-}
-
-EXPORT void EXPORT_GetSublevelStatus(char *name) {
-	if (name) {
-		*name = GetSublevelStatus(name);
-	}
 }
 
 EXPORT void EXPORT_GetSublevels() {
 	GetSublevels();
 }
 
-EXPORT void EXPORT_SetSpeed(float *speed_ptr) {
-	SetSpeed(*speed_ptr);
-	FREE(speed_ptr);
-}
-
-EXPORT void EXPORT_SetFOV(float *fov_ptr) {
-	SetFOV(*fov_ptr);
-	FREE(fov_ptr);
-}
-
-EXPORT void EXPORT_SetDOF(float *dof_ptr) {
-	SetDOF(*dof_ptr);
-	FREE(dof_ptr);
+EXPORT void EXPORT_GetSublevelStatus(char *str) {
+	if (str) {
+		*str = GetSublevelStatus(str);
+	}
 }
 
 EXPORT void EXPORT_LoadLevelStreamByString(char *str) {
@@ -115,4 +78,46 @@ EXPORT void EXPORT_UnloadLevelStreamByString(char *str) {
 	if (str) {
 		LevelStream(GetIdByString(str), 0);
 	}
+}
+
+EXPORT void EXPORT_SetFOV(float *fov) {
+	if (fov && !Loading()) {
+		SetFOV(*fov);
+	}
+}
+
+DOLLY dolly = { 0 };
+EXPORT void EXPORT_AddDollyMarker(DWORD *frame) {
+	if (!dolly.markers.buffer) {
+		dolly.markers = ArrayNew(sizeof(MARKER));
+	}
+
+	DWORD i;
+	for (i = 0; i < dolly.markers.length; ++i) {
+		if (((MARKER *)ArrayGet(&dolly.markers, i))->frame >= *frame) {
+			break;
+		}
+	}
+
+	MARKER marker = GetMarker(*frame);
+	ArrayPush(&dolly.markers, &marker);
+
+	for (DWORD e = dolly.markers.length - 1; e > i; --e) {
+		ArraySet(&dolly.markers, e, ArrayGet(&dolly.markers, e - 1));
+	}
+
+	ArraySet(&dolly.markers, i, &marker);
+}
+
+EXPORT void EXPORT_ResetDolly() {
+	dolly.markers.length = 0;
+	dolly.animations.length = 0;
+}
+
+EXPORT void EXPORT_PlayDolly() {
+	if (dolly.markers.length < 2) {
+		return;
+	}
+
+	PlayDolly(&dolly);
 }

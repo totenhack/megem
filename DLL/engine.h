@@ -1,11 +1,15 @@
 #pragma once
 
+#define ENGINE_SPEED 0xC2C
+#define ENGINE_PAUSED 0xC54
+
 void SetupEngine();
-int GetEngineBase();
-void ToggleGodMode(bool);
-void ToggleFloatMode(bool);
-void KickGlitch(bool);
+void KG(bool);
 void Strang(bool);
-void SetFloatIncrease(bool);
-void SetFloatDecrease(bool);
+void Beamer(bool);
+void God(bool);
+void Float(bool);
+DWORD GetEngineBase();
+void OpenDebugConsole();
+void CloseDebugConsole();
 bool Loading();

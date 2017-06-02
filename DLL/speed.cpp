@@ -1,7 +1,6 @@
 #include "stdafx.h"
 
-float speed = 1;
-
+float process_speed = 1;
 LONGLONG QueryPerformanceCounterInitial, QueryPerformanceCounterOffset;
 DWORD GetTickCountInitial, GetTickCountOffset;
 DWORD timeGetTimeInitial, timeGetTimeOffset;
@@ -15,20 +14,20 @@ BOOL WINAPI QueryPerformanceCounterHook(LARGE_INTEGER *lpPerformanceCount) {
 
 	BOOL ret = QueryPerformanceCounterOriginal(&current);
 
-	lpPerformanceCount->QuadPart = (LONGLONG)((current.QuadPart - QueryPerformanceCounterInitial) * speed) + QueryPerformanceCounterOffset;
+	lpPerformanceCount->QuadPart = (LONGLONG)((current.QuadPart - QueryPerformanceCounterInitial) * process_speed) + QueryPerformanceCounterOffset;
 
 	return ret;
 }
 
 DWORD WINAPI GetTickCountHook() {
-	return (DWORD)((GetTickCountOriginal() - GetTickCountInitial) * speed) + GetTickCountOffset;
+	return (DWORD)((GetTickCountOriginal() - GetTickCountInitial) * process_speed) + GetTickCountOffset;
 }
 
 DWORD __stdcall timeGetTimeHook() {
-	return (DWORD)((timeGetTimeOriginal() - timeGetTimeInitial) * speed) + timeGetTimeOffset;
+	return (DWORD)((timeGetTimeOriginal() - timeGetTimeInitial) * process_speed) + timeGetTimeOffset;
 }
 
-void SetSpeed(float s) {
+void SetProcessSpeed(float s) {
 	GetTickCountOffset = GetTickCount();
 	GetTickCountInitial = GetTickCountOriginal();
 
@@ -41,23 +40,14 @@ void SetSpeed(float s) {
 	QueryPerformanceCounterOriginal(&t);
 	QueryPerformanceCounterInitial = t.QuadPart;
 
-	speed = s;
-	GetData()->process_speed = speed;
-}
-
-float GetSpeed() {
-	return speed;
+	process_speed = s;
+	GetData()->process_speed = s;
 }
 
 void SetupSpeed() {
-	QueryPerformanceCounterOriginal = (BOOL(WINAPI *)(LARGE_INTEGER *))NewGate(0);
-	StaticTrampolineHook(QueryPerformanceCounter, QueryPerformanceCounterHook, QueryPerformanceCounterOriginal, 0);
+	TrampolineHook(QueryPerformanceCounterHook, QueryPerformanceCounter, (void **)&QueryPerformanceCounterOriginal);
+	TrampolineHook(GetTickCountHook, GetTickCount, (void **)&GetTickCountOriginal);
+	TrampolineHook(timeGetTimeHook, timeGetTime, (void **)&timeGetTimeOriginal);
 
-	GetTickCountOriginal = (DWORD(WINAPI *)())NewGate(2);
-	StaticTrampolineHook(GetTickCount, GetTickCountHook, GetTickCountOriginal, 2);
-
-	timeGetTimeOriginal = (DWORD(__stdcall *)())NewGate(1);
-	StaticTrampolineHook(timeGetTime, timeGetTimeHook, timeGetTimeOriginal, 1);
-
-	SetSpeed(1);
+	SetProcessSpeed(1);
 }

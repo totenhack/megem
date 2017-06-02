@@ -2,22 +2,22 @@
 
 bool rendering_enabled = true;
 
-void(*RenderOriginal)();
 HRESULT(__stdcall *PresentOriginal)(IDirect3DDevice9 *pDevice, RECT *pSourceRect, CONST RECT *pDestRect, HWND hDestWindowOverride, CONST RGNDATA *pDirtyRegion);
 
-__declspec(naked) void RenderHook() {
-	__asm {
-		mov PresentOriginal, edx
-		mov edx, PresentHook
-		jmp RenderOriginal
-	}
+void WriteText(LPDIRECT3DDEVICE9 device, int pt, UINT weight, DWORD align, char *font, DWORD color, int x, int y, char *text, int length) {
+	LPD3DXFONT lpFont;
+	D3DXCreateFontA(device, pt, 0, weight, 1, 0, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, font, &lpFont);
+
+	RECT r = { x, y, x, y };
+	lpFont->DrawTextA(NULL, text, length, &r, DT_NOCLIP | align, color);
+	lpFont->Release();
 }
 
-HRESULT __stdcall PresentHook(IDirect3DDevice9 *pDevice, RECT *pSourceRect, CONST RECT *pDestRect, HWND hDestWindowOverride, CONST RGNDATA *pDirtyRegion) {
-	DATA *data = GetData();
+#define WATERMARK "Megem V1.0"
 
-	data->process_speed = GetSpeed();
-	
+HRESULT __stdcall PresentHook(IDirect3DDevice9 *pDevice, RECT *pSourceRect, CONST RECT *pDestRect, HWND hDestWindowOverride, CONST RGNDATA *pDirtyRegion) {
+	++(GetData()->frame);
+	WriteText(pDevice, 25, FW_NORMAL, DT_LEFT, "Arial", D3DCOLOR_ARGB(255, 255, 0, 0), 5, 5, WATERMARK, strlen(WATERMARK));
 	return rendering_enabled ? PresentOriginal(pDevice, pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion) : D3D_OK;
 }
 
@@ -30,8 +30,5 @@ void EnableRendering() {
 }
 
 void SetupRender() {
-	// int addr = 0x18B9D93;
-	int addr = FindPattern((DWORD)GetModuleHandle(0), 0x12800000, "\x8D\x4C\x24\x18\x51\x50\xFF\xD2\x3D\x68\x08\x76\x88\x75\x07", "xxxxxxxxxxxxxxx");
-	RenderOriginal = (void(*)())NewGate(0);
-	StaticTrampolineHook((void *)addr, RenderHook, RenderOriginal, 0);
+	TrampolineHook(PresentHook, (void *)GetD3D9Exports()[D3D9_EXPORT_PRESENT], (void **)&PresentOriginal);
 }

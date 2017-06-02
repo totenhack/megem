@@ -1,47 +1,54 @@
 #include "stdafx.h"
 
-DATA *data;
+DATA *data = (DATA *)calloc(sizeof(DATA), 1);
+KEYBINDS keybinds;
 
 void MainThread() {
-	data = (DATA *)malloc(sizeof(DATA));
-	memset(data, 0, sizeof(DATA));
+	if (!GetModuleHandleA("MirrorsEdge.exe")) {
+		return;
+	}
 
-	char path[0xFFF];
-	path[GetTempPathA(0xFFF, path)] = '\0';
-	strcat(path, "megem_data");
+	/* AllocConsole();
+	freopen("CONIN$", "r", stdin);
+	freopen("CONOUT$", "w", stdout);
+	freopen("CONOUT$", "w", stderr); */
 
-	FILE *file = fopen(path, "wb");
-	fwrite(&data, sizeof(int), 1, file);
-	fclose(file);
-
-	SetupPlayer();
 	SetupSpeed();
-	SetupRender();
-	SetupDolly();
+	SetupPlayer();
 	SetupEngine();
+	SetupRender();
 	SetupLevel();
+	SetupVisual();
+
+	char path[0xFF] = { 0 };
+	GetTempPathA(sizeof(path), path);
+	strcat(path, "megem.keybinds");
+	for (;;) {
+		FILE *file = fopen(path, "rb");
+		if (file) {
+			fread(&keybinds, sizeof(keybinds), 1, file);
+			fclose(file);
+		}
+		Sleep(1000);
+	}
+}
+
+KEYBINDS *GetKeybinds() {
+	return &keybinds;
 }
 
 DATA *GetData() {
 	return data;
 }
 
-int GetInt(void *address) {
-	static int i;
-	ReadProcessMemory(GetCurrentProcess(), address, &i, sizeof(int), NULL);
-	return i;
-}
-
-float GetFloat(void *address) {
-	static float i;
-	ReadProcessMemory(GetCurrentProcess(), address, &i, sizeof(float), NULL);
-	return i;
-}
-
-char GetByte(void *address) {
-	static char i;
-	ReadProcessMemory(GetCurrentProcess(), address, &i, sizeof(char), NULL);
-	return i;
+int wcsempty(const wchar_t *s) {
+	while (*s != L'\0') {
+		if (!iswblank(*s)) {
+			return 0;
+		}
+		s++;
+	}
+	return 1;
 }
 
 int IsGameWindow(HWND hWnd) {
@@ -59,10 +66,33 @@ int IsGameWindow(HWND hWnd) {
 	return 1;
 }
 
+void Keydown(SHORT k) {
+	INPUT input;
+	input.type = 1;
+	input.ki.time = 0;
+	input.ki.dwFlags = 0;
+	input.ki.wScan = 0;
+	input.ki.wVk = k;
+
+	SendInput(1, &input, sizeof(input));
+}
+
+void Keyup(SHORT k) {
+	INPUT input;
+	input.type = 1;
+	input.ki.time = 0;
+	input.ki.wScan = 0;
+	input.ki.wVk = k;
+	input.ki.dwFlags = 0x0002;
+
+	SendInput(1, &input, sizeof(input));
+}
+
 BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID reserved) {
-	if (reason == DLL_PROCESS_ATTACH && (DWORD)GetModuleHandleA("MirrorsEdge.exe") > 0) {
+	if (reason == DLL_PROCESS_ATTACH) {
 		CreateThread(0, 0, (LPTHREAD_START_ROUTINE)MainThread, 0, 0, 0);
 	}
 
 	return TRUE;
 }
+
