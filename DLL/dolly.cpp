@@ -20,7 +20,27 @@ void PlayDolly(DOLLY *dolly) {
 	StopDolly();
 
 	ARRAY *markers = &dolly->markers;
+	if (markers->length < 2) {
+		return;
+	}
 	length = ((MARKER *)ArrayGet(markers, markers->length - 1))->frame;
+
+	((MARKER *)ArrayGet(markers, 0))->ry += 0x10000;
+	for (unsigned int i = 1; i < markers->length; ++i) {
+		MARKER *previous = (MARKER *)ArrayGet(markers, i - 1);
+		MARKER *marker = (MARKER *)ArrayGet(markers, i);
+
+		int ry = (int)marker->ry;
+		while (ry < previous->ry) {
+			ry += 0x10000;
+		}
+
+		if (abs((int)((ry - 0x10000) - previous->ry)) < abs((int)(ry - previous->ry))) {
+			ry -= 0x10000;
+		}
+
+		marker->ry = (float)ry;
+	}
 
 	double *sets = (double *)malloc((sizeof(double) * 2) * markers->length);
 
@@ -74,10 +94,18 @@ void StopDolly() {
 	}
 
 	memset(&splines, 0, sizeof(splines));
+
+	if (strcmp(GetData()->level, "TdMainMenu") != 0) {
+		WriteChar(GetCurrentProcess(), (void *)(GetPlayerBase() + PLAYER_STATE), 2);
+		WriteChar(GetCurrentProcess(), (void *)(GetPlayerBase() + PLAYER_MOVEMENT_STATE), 1);
+		WriteChar(GetCurrentProcess(), (void *)(GetPlayerBase() + PLAYER_HAND_STATE), 0);
+		WriteChar(GetCurrentProcess(), (void *)(GetPlayerBase() + PLAYER_WALKING_STATE), 0);
+		WriteChar(GetCurrentProcess(), (void *)(GetPlayerBase() + PLAYER_ACTION_STATE), 0);
+	}
 }
 
 void UpdateDolly() {
-	if (splines.x.equation) {
+	if (splines.x.degree && splines.x.equation) {
 		if (frame < length) {
 			WriteChar(GetCurrentProcess(), (void *)(GetPlayerBase() + PLAYER_STATE), 0);
 			WriteChar(GetCurrentProcess(), (void *)(GetPlayerBase() + PLAYER_MOVEMENT_STATE), 32);

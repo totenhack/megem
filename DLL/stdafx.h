@@ -15,7 +15,7 @@
 #pragma comment(lib, "d3dx9.lib")
 
 typedef struct {
-	DWORD player_base, camera_base, engine_base, dof_base, uncap_base;
+	DWORD player_base, camera_base, engine_base, dof_base;
 	float top_speed;
 	float fov;
 	float process_speed;

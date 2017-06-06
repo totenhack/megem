@@ -1,64 +1,5 @@
 #include "stdafx.h"
 
-ARRAY ArrayNew(unsigned int element_size) {
-	ARRAY array;
-
-	array.element_size = element_size;
-	array.allocated = 0xFF;
-	array.buffer = malloc(array.element_size * array.allocated);
-	array.length = 0;
-
-	return array;
-}
-
-void *ArrayGet(ARRAY *array, unsigned int index) {
-	if (!array->buffer || !array->length || !array->allocated || !array->element_size) {
-		return NULL;
-	}
-
-	return (void *)((int)array->buffer + (index * array->element_size));
-}
-
-void *ArraySet(ARRAY *array, unsigned int index, void *element) {
-	if (!array->buffer || !array->allocated || !array->element_size) {
-		return NULL;
-	}
-
-	if (index >= array->allocated) {
-		array->allocated = index;
-		array->buffer = realloc(array->buffer, array->allocated * array->element_size);
-	}
-
-	return memcpy((void *)((int)array->buffer + (index * array->element_size)), element, array->element_size);
-}
-
-void *ArrayPush(ARRAY *array, void *element) {
-	if (!array->buffer || !array->allocated || !array->element_size) {
-		return NULL;
-	}
-
-	if (array->length >= array->allocated) {
-		array->allocated *= 2;
-		array->buffer = realloc(array->buffer, array->allocated * array->element_size);
-	}
-
-	return memcpy((void *)((int)array->buffer + (array->length++ * array->element_size)), element, array->element_size);
-}
-
-void *ArrayPop(ARRAY *array) {
-	void *element = ArrayGet(array, array->length - 1);
-	array->length--;
-	return element;
-}
-
-void ArrayFree(ARRAY *array) {
-	if (array->buffer) {
-		free(array->buffer);
-	}
-
-	memset(array, 0, sizeof(ARRAY));
-}
-
 char *WCharToChar(char *dest, wchar_t *src) {
 	sprintf(dest, "%ws", src);
 
@@ -202,39 +143,6 @@ int _thread_compare(const void *a, const void *b) {
 	long long diff = GetThreadCreationTime(thread_a).QuadPart - GetThreadCreationTime(thread_b).QuadPart;
 
 	return diff == 0 ? 0 : diff < 0 ? -1 : 1;
-}
-
-THREADENTRY32 GetThreadInfoByNumber(int process_id, int number) {
-	ARRAY threads = ArrayNew(sizeof(HANDLE));
-
-	THREADENTRY32 entry;
-	memset(&entry, 0, sizeof(THREADENTRY32));
-	entry.dwSize = sizeof(THREADENTRY32);
-
-	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, process_id);
-
-	if (Thread32First(snapshot, &entry)) {
-		do {
-			if (entry.th32OwnerProcessID == process_id) {
-				HANDLE thread = OpenThread(THREAD_ALL_ACCESS, 0, entry.th32ThreadID);
-				ArrayPush(&threads, &thread);
-			}
-		} while (Thread32Next(snapshot, &entry));
-	}
-
-	CloseHandle(snapshot);
-
-	qsort(threads.buffer, threads.length, threads.element_size, _thread_compare);
-
-	THREADENTRY32 thread_info = GetThreadInfoById(GetThreadId(*(HANDLE *)ArrayGet(&threads, number)));
-
-	for (unsigned int i = 0; i < threads.length; i++) {
-		CloseHandle(*(HANDLE *)ArrayGet(&threads, i));
-	}
-
-	ArrayFree(&threads);
-
-	return thread_info;
 }
 
 void *GetThreadStackTop(int thread_id) {

@@ -6,11 +6,12 @@ int(__thiscall *UpdatePlayerOriginal)(int, int, int);
 void(*UpdateCameraOriginal)();
 void(*UpdateMenuOriginal)();
 void(*UpdateCapOriginal)();
+DWORD static_base = 0;
 
 int __fastcall UpdatePlayerHook(int this_, void *idle_, int a1, int a2) {
-	GetData()->player_base = player_base;
-	player_base = this_;
-	return UpdatePlayerOriginal(this_, a1, a2);;
+	GetData()->player_base = player_base = this_;
+
+	return UpdatePlayerOriginal(this_, a1, a2);
 }
 
 __declspec(naked) void UpdateMenuHook() {
@@ -45,24 +46,9 @@ __declspec(naked) void UpdateCameraHook() {
 	}
 }
 
-__declspec(naked) void UpdateCapHook() {
-	__asm {
-		mov uncap_base, eax
-		push ecx
-		push eax
-	}
-
-	GetData()->uncap_base = uncap_base;
-
-	__asm {
-		pop eax
-		pop ecx
-		jmp UpdateCapOriginal
-	}
-}
-
 DWORD GetPlayerBase() {
 	return player_base;
+	// return strcmp(GetData()->level, "TdMainMenu") == 0 ? player_base : (GetData()->player_base = (DWORD)GetPointer(GetCurrentProcess(), 5, static_base, 0xCC, 0x4A4, 0x214, 0x00));
 }
 
 DWORD GetCameraBase() {
@@ -79,6 +65,9 @@ int DegreesToInt(float i) {
 }
 
 void SetupPlayer() {
+	static_base = (DWORD)FindPattern((void *)((DWORD)GetModuleHandle(0)), 0x12800000, "\x89\x0D\x00\x00\x00\x00\xB9\x00\x00\x00\x00\xFF", "xx????x????x");
+	static_base = *(DWORD *)(static_base + 0x2);
+
 	DWORD addr;
 
 	addr = 0x12B5690;
@@ -89,7 +78,4 @@ void SetupPlayer() {
 
 	addr = 0xB5C050;
 	TrampolineHook(UpdateCameraHook, (void *)addr, (void **)&UpdateCameraOriginal);
-
-	addr = 0xEFA267;
-	TrampolineHook(UpdateCapHook, (void *)addr, (void **)&UpdateCapOriginal);
 }

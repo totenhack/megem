@@ -19,11 +19,11 @@ STATE SaveState() {
 // DWORD player_offsets[] = { 0x40, 0x44, 0x68, 0xE8, 0xEC, 0xF0, 0xF4, 0xF8, 0xFC, 0x100, 0x104, 0x108, 0x10C, 0x110, 0x114, 0x154, 0x158, 0x15C, 0x160, 0x164, 0x168, 0x16C, 0x1C0, 0x1C8, 0x1DC, 0x1E4, 0x1FC, 0x20C, 0x264, 0x2A0, 0x2A4, 0x2A8, 0x2AC, 0x2B8, 0x2E0, 0x2E4, 0x2E8, 0x3B4, 0x428, 0x4CC, 0x4D0, 0x4D4, 0x4F4, 0x4FC, 0x4FE, 0x500, 0x503, 0x505, 0x57F, 0x5D0, 0x5D4, 0x610, 0x614, 0x630, 0x634, 0x6F8, 0x6FC, 0x700, 0x704, 0x708, 0x70C, 0x72C };
 // DWORD camera_offsets[] = { 0xF4, 0xF8, 0xFC, 0x254, 0x258, 0x25C, 0x260, 0x264, 0x268, 0x26C, 0x270, 0x530, 0x58C, 0x5E0, 0x638, 0x63C }; */
 
-DWORD player_offsets[] = { PLAYER_X, PLAYER_Y, PLAYER_Z, PLAYER_VX, PLAYER_VY, PLAYER_VZ, PLAYER_RX, PLAYER_RY, PLAYER_RZ, PLAYER_STATE, PLAYER_WALL_STATE, PLAYER_WALL_VZ, PLAYER_WALLRUN_STATE, PLAYER_WALLRUN_STATE + 4, 0x630, PLAYER_MOVEMENT_STATE, PLAYER_ACTION_STATE, PLAYER_WALKING_STATE, PLAYER_HEALTH, PLAYER_FY };
+DWORD player_offsets[] = { PLAYER_X, PLAYER_Y, PLAYER_Z, PLAYER_VX, PLAYER_VY, PLAYER_VZ, PLAYER_RX, PLAYER_RY, PLAYER_RZ, PLAYER_HEALTH, PLAYER_FZ, PLAYER_STATE, PLAYER_WALL_STATE, PLAYER_WALL_VZ, PLAYER_WALLRUN_STATE, PLAYER_WALLRUN_STATE + 4, 0x630, PLAYER_MOVEMENT_STATE, PLAYER_ACTION_STATE, PLAYER_WALKING_STATE };
 DWORD camera_offsets[] = { CAMERA_RX, CAMERA_RY, CAMERA_RZ };
 
 void LoadState(STATE *state) {
-	if (GetProcess()) {
+	if (GetProcess() && !FlyOn() && !GetData().loading) {
 		DATA data = GetData();
 
 		if (strcmp(data.level, state->level) != 0) {
@@ -36,6 +36,7 @@ void LoadState(STATE *state) {
 
 		WriteFloat(GetProcess(), (void *)(data.player_base + PLAYER_COLLISION), -105.578125);
 		WriteInt(GetProcess(), (void *)(data.camera_base + CAMERA_LOCK), 0);
+
 		if (*(char *)(state->player + PLAYER_STATE) == 12) {
 			CallFunction("EXPORT_DisableRendering", 0);
 
@@ -111,16 +112,24 @@ void LoadState(STATE *state) {
 				WriteInt(GetProcess(), (void *)(data.camera_base + camera_offsets[i]), *(DWORD *)(state->camera + camera_offsets[i]));
 			}
 		} else {
-			for (int i = 0; i < sizeof(player_offsets) / sizeof(DWORD); ++i) {
-				WriteInt(GetProcess(), (void *)(data.player_base + player_offsets[i]), *(DWORD *)(state->player + player_offsets[i]));
-			}
-
 			if (*(char *)(state->player + PLAYER_STATE) == 1) {
+				for (int i = 0; i < sizeof(player_offsets) / sizeof(DWORD); ++i) {
+					if (player_offsets[i] == PLAYER_STATE) {
+						break;
+					}
+					WriteInt(GetProcess(), (void *)(data.player_base + player_offsets[i]), *(DWORD *)(state->player + player_offsets[i]));
+				}
 				WriteChar(GetProcess(), (void *)(data.player_base + PLAYER_STATE), 2);
-				WriteChar(GetProcess(), (void *)(data.player_base + PLAYER_MOVEMENT_STATE), 11);
-				WriteChar(GetProcess(), (void *)(data.player_base + PLAYER_HAND_STATE), 0);
-				WriteChar(GetProcess(), (void *)(data.player_base + PLAYER_WALKING_STATE), 5);
-				WriteChar(GetProcess(), (void *)(data.player_base + PLAYER_ACTION_STATE), 0);
+				CallFunction("EXPORT_FloatOn", 0);
+				long long frame = GetData().frame + 1;
+				while (GetData().frame <= frame) {
+					Sleep(1);
+				}
+				CallFunction("EXPORT_FloatOff", 0);
+			} else {
+				for (int i = 0; i < sizeof(player_offsets) / sizeof(DWORD); ++i) {
+					WriteInt(GetProcess(), (void *)(data.player_base + player_offsets[i]), *(DWORD *)(state->player + player_offsets[i]));
+				}
 			}
 
 			for (int i = 0; i < sizeof(camera_offsets) / sizeof(DWORD); ++i) {

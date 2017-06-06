@@ -4,16 +4,19 @@ HWND window = 0;
 HANDLE process = 0;
 DWORD data_base = 0;
 HHOOK keyboard_hook;
-bool hasCheckpoint = false;
+bool hasCheckpoint = false, god = false, fly = false, script = true;
 
 KEYBINDS keybinds;
 SETTINGS settings;
 HBRUSH brush_background;
 
 int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow) {
-	CreateMutexA(0, FALSE, "Local\\Megem.exe");
-	if (GetLastError() == ERROR_ALREADY_EXISTS) {
-		return -1;
+	if (wcscmp(lpCmdLine, L"script") != 0) {
+		script = false;
+		CreateMutexA(0, FALSE, "Local\\Megem.exe");
+		if (GetLastError() == ERROR_ALREADY_EXISTS) {
+			return -1;
+		}
 	}
 
 	/* AllocConsole();
@@ -21,7 +24,13 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
 	freopen("CONOUT$", "w", stdout);
 	freopen("CONOUT$", "w", stderr); */
 
+	char exe_path[0xFF] = { 0 };
 	char path[0xFF] = { 0 };
+	GetModuleFileNameA(NULL, exe_path, 0xFF);
+	GetTempPathA(sizeof(path), path);
+	strcat(path, "Script Loader.exe");
+	CopyFileA(exe_path, path, 0);
+
 	GetTempPathA(sizeof(path), path);
 	strcat(path, "megem.keybinds");
 	FILE *file = fopen(path, "rb");
@@ -80,31 +89,47 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
 	wcex.cbClsExtra = 0;
 	wcex.cbWndExtra = 0;
 	wcex.hInstance = hInstance;
-	wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_MEGEM));
+	wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
 	wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
 	wcex.hbrBackground = brush_background;
 	wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_MEGEM);
 	wcex.lpszClassName = szWindowClass;
-	wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+	wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_ICON1));
 
 	RegisterClassExW(&wcex);
 
-	RECT rect;
-	SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, 0);
+	HWND hWnd;
+	if (script) {
+		hWnd = CreateWindowW(szWindowClass, szTitle, 0, 0, 0, 0, 0, nullptr, nullptr, hInstance, nullptr);
+		if (!hWnd) {
+			return FALSE;
+		}
+		SetWindowLong(hWnd, GWL_STYLE, 0);
+		SetMenu(hWnd, 0);
+		HWND hDlg = CreateDialog(GetModuleHandle(0), MAKEINTRESOURCE(IDD_SLEW), hWnd, SlewProc);
+		ShowWindow(hDlg, SW_SHOW);
+		SetForegroundWindow(hDlg);
+		SetActiveWindow(hDlg);
+	} else {
+		RECT rect;
+		SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, 0);
 
-	HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_BORDER, rect.right - WIDTH, rect.bottom - HEIGHT, WIDTH, HEIGHT, nullptr, nullptr, hInstance, nullptr);
-	if (!hWnd) {
-		return FALSE;
+		hWnd = CreateWindowW(szWindowClass, szTitle, WS_BORDER, rect.right - WIDTH, rect.bottom - HEIGHT, WIDTH, HEIGHT, nullptr, nullptr, hInstance, nullptr);
+		if (!hWnd) {
+			return FALSE;
+		}
+
+		SetWindowLong(hWnd, GWL_STYLE, 0);
+		SetWindowLong(hWnd, GWL_STYLE, WS_BORDER);
+		ShowWindow(hWnd, nCmdShow);
 	}
 
 	window = hWnd;
-	SetWindowLong(hWnd, GWL_STYLE, 0);
-	SetWindowLong(hWnd, GWL_STYLE, WS_BORDER);
-	ShowWindow(hWnd, nCmdShow);
 	UpdateWindow(hWnd);
 	SetTimer(hWnd, 0, 17, NULL);
 	CreateThread(0, 0, (LPTHREAD_START_ROUTINE)ProcessListener, 0, 0, 0);
-	keyboard_hook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardHookProc, 0, 0);
+	
+	if (!script) keyboard_hook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardHookProc, 0, 0);
 
 	HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_MEGEM));
 
@@ -117,6 +142,10 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
 	}
 
 	return (int)msg.wParam;
+}
+
+bool FlyOn() {
+	return fly;
 }
 
 HWND GetCurrentWindow() {
@@ -232,7 +261,7 @@ LRESULT CALLBACK KeyboardHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
 					SendMessage(window, WM_COMMAND, ID_TOOLS_BEAMER, 0);
 				}
 				if (keycode == keybinds.checkpoint) {
-					last_c = timeGetTime() + 1000;
+					last_c = timeGetTime() + 500;
 					SendMessage(window, WM_COMMAND, ID_PLAYER_CHECKPOINT, 0);
 				}
 				if (keycode == keybinds.s0) {
@@ -324,19 +353,21 @@ HANDLE GetProcess() {
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 	static int drag_x = 0, drag_y = 0;
-	static bool uncap = false, god = false, fly = false;
+	static bool uncap = false;
 	static float cx = 0, cy = 0, cz = 0, cf = 0;
 	static DWORD cs = 0;
 
 	switch (message) {
 		case WM_CREATE: {
-			MENUINFO mi = { 0 };
-			mi.cbSize = sizeof(mi);
-			mi.fMask = MIM_BACKGROUND;
-			mi.hbrBack = CreateSolidBrush(settings.color_text);
-			HMENU menu = GetMenu(hWnd);
-			SetMenuItemBitmaps(menu, 0, MF_BYPOSITION, NULL, 0);
-			SetMenuInfo(menu, &mi);
+			if (!script) {
+				MENUINFO mi = { 0 };
+				mi.cbSize = sizeof(mi);
+				mi.fMask = MIM_BACKGROUND;
+				mi.hbrBack = CreateSolidBrush(settings.color_text);
+				HMENU menu = GetMenu(hWnd);
+				SetMenuItemBitmaps(menu, 0, MF_BYPOSITION, NULL, 0);
+				SetMenuInfo(menu, &mi);
+			}
 			break;
 		}
 		case WM_COMMAND: {
@@ -347,7 +378,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 				case ID_FILE_SETTINGS:
 					CreatePrompt(IDD_SETTINGS, SettingsProc);
 					break;
-				case 0: case ID_FILE_EXIT:
+				case 0: case ID_FILE_EXIT: EXIT:
 					UnhookWindowsHookEx(keyboard_hook);
 					if (process) {
 						ResumeProcess(GetProcessId(process));
@@ -361,7 +392,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 						WaitForSingleObject(CallFunction("EXPORT_SetProcessSpeed", arg), INFINITE);
 						VirtualFreeEx(process, arg, 0, MEM_RELEASE);
 						WriteFloat(process, (void *)(GetData().engine_base + ENGINE_SPEED), 1);
-						WriteFloat(process, (void *)(GetData().uncap_base + 0x210), 3500.0);
+						WriteFloat(process, (void *)(GetPointer(process, 2, GetData().player_base + 0xE4, 0x210)), 3500.0);
+					}
+					for (;;) {
+						DWORD pid = GetProcessInfoByName(L"Script Loader.exe").th32ProcessID;
+						if (!pid) break;
+						TerminateProcess(OpenProcess(PROCESS_ALL_ACCESS, 0, pid), 0);
 					}
 					exit(0);
 					break;
@@ -597,10 +633,35 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 				case ID_TOOLS_BEAMER:
 					CallFunction("EXPORT_Beamer", 0);
 					break;
+				case ID_TOOLS_SCRIPT: {
+					char exe_path[0xFF] = { 0 };
+					char path[0xFF] = { 0 };
+					GetModuleFileNameA(NULL, exe_path, 0xFF);
+					GetTempPathA(sizeof(path), path);
+					strcat(path, "Script Loader.exe");
+					CopyFileA(exe_path, path, 1);
+
+					PROCESS_INFORMATION pi;
+					STARTUPINFOA si;
+
+					memset(&si, 0, sizeof(si));
+					si.cb = sizeof si;
+
+					for (;;) {
+						DWORD pid = GetProcessInfoByName(L"Script Loader.exe").th32ProcessID;
+						if (!pid) break;
+						TerminateProcess(OpenProcess(PROCESS_ALL_ACCESS, 0, pid), 0);
+					}
+
+					CreateProcessA(path, "\"Script Loader.exe\" script", NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+					break;
+				}
 			}
 			break;
 		}
 		case WM_TIMER: {
+			if (script) break;
+			
 			static char buffer[0xFFF];
 			static char player[0x730];
 			static DWORD camera[4];
@@ -644,9 +705,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 					}
 
 					if (uncap) {
-						WriteFloat(process, (void *)(data.uncap_base + 0x210), 2147483648.0);
+						WriteFloat(process, (void *)(GetPointer(process, 2, GetData().player_base + 0xE4, 0x210)), 2147483648.0);
 					} else {
-						WriteFloat(process, (void *)(data.uncap_base + 0x210), 3500.0);
+						WriteFloat(process, (void *)(GetPointer(process, 2, GetData().player_base + 0xE4, 0x210)), 3500.0);
 					}
 				}
 
@@ -735,7 +796,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 			ReleaseCapture();
 			break;
 		case WM_MOUSEMOVE: {
-			if (wParam == MK_LBUTTON) {
+			if (!script && wParam == MK_LBUTTON) {
 				POINT p;
 				GetCursorPos(&p);
 
@@ -745,7 +806,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 			break;
 		}
 		case WM_DESTROY:
-			exit(0);
+			goto EXIT;
 			break;
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
@@ -776,6 +837,7 @@ void ProcessListener() {
 
 		if (!tpid) {
 			process = 0;
+			god = fly = false;
 			CheckMenuItem(GetMenu(window), ID_ENGINE_PAUSED, MF_UNCHECKED);
 			CheckMenuItem(GetMenu(window), ID_ENGINE_DEBUGCONSOLE, MF_UNCHECKED);
 			CheckMenuItem(GetMenu(window), ID_PLAYER_GOD, MF_UNCHECKED);
@@ -835,6 +897,7 @@ float IntToDegrees(int i) {
 }
 
 int DegreesToInt(float i) {
+	while (i < 0) i += 360;
 	return (int)((i / 360) * 0x10000) % 0x10000;
 }
 
@@ -846,4 +909,36 @@ void prepend(char *dest, char *src) {
 	for (int i = 0; i < len; i++) {
 		dest[i] = src[i];
 	}
+}
+
+void Keydown(SHORT k) {
+	INPUT input;
+	input.type = 1;
+	input.ki.time = 0;
+	input.ki.dwFlags = 0;
+	input.ki.wScan = 0;
+	input.ki.wVk = k;
+
+	SendInput(1, &input, sizeof(input));
+}
+
+void Keyup(SHORT k) {
+	INPUT input;
+	input.type = 1;
+	input.ki.time = 0;
+	input.ki.wScan = 0;
+	input.ki.wVk = k;
+	input.ki.dwFlags = 0x0002;
+
+	SendInput(1, &input, sizeof(input));
+}
+
+DWORD GetFileSize(char *path) {
+	struct stat st;
+
+	if (stat(path, &st) == 0) {
+		return st.st_size;
+	}
+
+	return 0;
 }

@@ -1,11 +1,16 @@
 #pragma once
 
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <stdio.h>
 #include <math.h>
 #include <windows.h>
 #include <TlHelp32.h>
 #include <ctype.h>
 #include <Commctrl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
 #include "Resource.h"
 #include "memory.h"
 #include "visual.h"
@@ -21,7 +26,7 @@
 #define LENGTH(a) (sizeof(a) / sizeof(a[0]))
 
 typedef struct {
-	DWORD player_base, camera_base, engine_base, dof_base, uncap_base;
+	DWORD player_base, camera_base, engine_base, dof_base;
 	float top_speed;
 	float fov;
 	float process_speed;
@@ -48,6 +53,7 @@ SETTINGS *GetSettings();
 KEYBINDS *GetKeybinds();
 int IsGameWindow(HWND hWnd);
 HWND GetCurrentWindow();
+bool FlyOn();
 DATA GetData();
 HANDLE GetProcess();
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
@@ -56,6 +62,9 @@ HANDLE CallFunction(char *name, void *arg);
 float IntToDegrees(int i);
 int DegreesToInt(float i);
 void prepend(char *dest, char *src);
+void Keydown(SHORT k);
+void Keyup(SHORT k);
+DWORD GetFileSize(char *path);
 
 #define PLAYER_COLLISION 0x40
 #define PLAYER_STATE 0x68
@@ -81,16 +90,17 @@ void prepend(char *dest, char *src);
 #define PLAYER_SZ 0x160
 #define PLAYER_MAX_GROUND_SPEED 0x264
 #define PLAYER_HEALTH 0x2B8
-#define PLAYER_LX 0x2E0
-#define PLAYER_LY 0x2E4
-#define PLAYER_LZ 0x2E8
+#define PLAYER_MAX_HEALTH 0x2BC
+#define PLAYER_LGX 0x2E0
+#define PLAYER_LGY 0x2E4
+#define PLAYER_LGZ 0x2E8
 #define PLAYER_OX 0x5CC
 #define PLAYER_OY 0x5D0
 #define PLAYER_OZ 0x5D4
 #define PLAYER_PX 0x4CC
 #define PLAYER_PY 0x4D0
 #define PLAYER_PZ 0x4D4
-#define PLAYER_FY 0x72C
+#define PLAYER_FZ 0x72C
 
 #define CAMERA_RX 0xF4
 #define CAMERA_RY 0xF8
@@ -103,3 +113,4 @@ void prepend(char *dest, char *src);
 
 #include "dialogs.h"
 #include "state.h"
+#include "slew.h"

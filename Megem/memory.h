@@ -146,20 +146,6 @@ enum {
 	D3D9_EXPORT_CREATEQUERY
 };
 
-typedef struct {
-	void *buffer;
-
-	unsigned int length;
-	unsigned int allocated, element_size;
-} ARRAY;
-
-ARRAY ArrayNew(unsigned int element_size);
-void *ArrayGet(ARRAY *array, unsigned int index);
-void *ArraySet(ARRAY *array, unsigned int index, void *element);
-void *ArrayPush(ARRAY *array, void *element);
-void *ArrayPop(ARRAY *array);
-void ArrayFree(ARRAY *array);
-
 char *WCharToChar(char *dest, wchar_t *src);
 wchar_t *CharToWChar(wchar_t *dest, char *src);
 int MessageBoxF(HWND hWnd, LPCSTR lpCaption, UINT uType, const LPCSTR lpText, ...);
@@ -170,7 +156,6 @@ void SuspendProcess(int process_id);
 void ResumeProcess(int process_id);
 ULARGE_INTEGER GetThreadCreationTime(HANDLE thread);
 THREADENTRY32 GetThreadInfoById(int thread_id);
-THREADENTRY32 GetThreadInfoByNumber(int process_id, int number);
 void *GetThreadStackTop(int thread_id);
 void *GetThreadStack(int thread_id);
 unsigned int GetProcessThreadCount(int process_id);

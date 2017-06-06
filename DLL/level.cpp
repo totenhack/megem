@@ -34,10 +34,10 @@ void GetStringById(int id, char *out) {
 }
 
 int GetIdByString(char *str) {
-	void *ptr = (void *)sublevel_id_list;
-	ptr = *(void **)ptr;
-	ptr = *(void **)((int)ptr + 0x50);
-	ptr = **(void ***)((int)ptr + 0x3C);
+	void *ptr = GetPointer(GetCurrentProcess(), 5, sublevel_id_list, 0x50, 0x3C, 0x00, 0x00);
+	if (!ptr) {
+		return 0;
+	}
 
 	int sublevel_count = *(int *)((int)ptr + 0xBF0);
 	void *sublevels_base = *(void **)((int)ptr + 0xBEC);
@@ -65,10 +65,10 @@ char GetSublevelStatus(char *name) {
 		return 0;
 	}
 
-	void *ptr = (void *)0x1FFBCA4;
-	ptr = *(void **)ptr;
-	ptr = *(void **)((int)ptr + 0x50);
-	ptr = **(void ***)((int)ptr + 0x3C);
+	void *ptr = GetPointer(GetCurrentProcess(), 5, sublevel_id_list, 0x50, 0x3C, 0x00, 0x00);
+	if (!ptr) {
+		return 0;
+	}
 
 	int max_sublevels = *(int *)((int)ptr + 0xBF0);
 	void *sublevels_base = *(void **)((int)ptr + 0xBEC);
@@ -100,10 +100,10 @@ void GetSublevels() {
 		free(GetData()->sublevels);
 	}
 
-	void *ptr = (void *)sublevel_id_list;
-	ptr = *(void **)ptr;
-	ptr = *(void **)((int)ptr + 0x50);
-	ptr = **(void ***)((int)ptr + 0x3C);
+	void *ptr = GetPointer(GetCurrentProcess(), 5, sublevel_id_list, 0x50, 0x3C, 0x00, 0x00);
+	if (!ptr) {
+		return;
+	}
 
 	int sublevel_count = *(int *)((int)ptr + 0xBF0);
 	void *sublevels_base = *(void **)((int)ptr + 0xBEC);

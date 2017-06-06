@@ -16,8 +16,7 @@ void WriteText(LPDIRECT3DDEVICE9 device, int pt, UINT weight, DWORD align, char 
 #define WATERMARK "Megem V1.0"
 
 HRESULT __stdcall PresentHook(IDirect3DDevice9 *pDevice, RECT *pSourceRect, CONST RECT *pDestRect, HWND hDestWindowOverride, CONST RGNDATA *pDirtyRegion) {
-	++(GetData()->frame);
-	WriteText(pDevice, 25, FW_NORMAL, DT_LEFT, "Arial", D3DCOLOR_ARGB(255, 255, 0, 0), 5, 5, WATERMARK, strlen(WATERMARK));
+	// WriteText(pDevice, 25, FW_NORMAL, DT_LEFT, "Arial", D3DCOLOR_ARGB(255, 255, 0, 0), 5, 5, WATERMARK, strlen(WATERMARK));
 	return rendering_enabled ? PresentOriginal(pDevice, pSourceRect, pDestRect, hDestWindowOverride, pDirtyRegion) : D3D_OK;
 }
 
@@ -30,5 +29,5 @@ void EnableRendering() {
 }
 
 void SetupRender() {
-	TrampolineHook(PresentHook, (void *)GetD3D9Exports()[D3D9_EXPORT_PRESENT], (void **)&PresentOriginal);
+	// TrampolineHook(PresentHook, (void *)GetD3D9Exports()[D3D9_EXPORT_PRESENT], (void **)&PresentOriginal);
 }

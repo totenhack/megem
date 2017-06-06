@@ -12,8 +12,10 @@ char *zero = (char *)calloc(0xFFF, 1);
 
 void(*GetEngineBaseOriginal)();
 int(__thiscall *UpdateEngineOriginal)(int this_);
-void(*LevelLoadOriginal)();
+DWORD LevelLoadBase = 0;
+int(__thiscall *LevelLoadOriginal)(void *this_, int, __int64);
 void **(__thiscall *DebugPrintOriginal)(void **, void *);
+HMODULE(WINAPI *LoadLibraryAOriginal)(char *);
 
 __declspec(naked) void GetEngineBaseHook() {
 	__asm {
@@ -38,6 +40,7 @@ int __fastcall UpdateEngineHook(int this_, void *idle_) {
 	GetData()->loading = Loading();
 
 	if (!Loading()) {
+		++(GetData()->frame);
 		UpdateDolly();
 		GetData()->fov = GetFOV();
 
@@ -184,7 +187,7 @@ int __fastcall UpdateEngineHook(int this_, void *idle_) {
 				GetData()->top_speed = last_speed;
 				top_speed_frame = 0;
 			}
-			if (++top_speed_frame >= 200) {
+			if (++top_speed_frame >= 200 || GetData()->top_speed * 0.036 >= 9969413) {
 				GetData()->top_speed = 0;
 			}
 		}
@@ -199,10 +202,26 @@ int __fastcall UpdateEngineHook(int this_, void *idle_) {
 	return UpdateEngineOriginal(this_);
 }
 
-__declspec(naked) void LevelLoadHook() {
+int __fastcall LevelLoadHook(void *this_, void *idle_, int a2, __int64 a3) {
+	static_load = true;
+	kg = beamer = strang = false;
+	GetData()->player_base = (DWORD)zero;
+	GetData()->camera_base = (DWORD)zero;
+	GetData()->top_speed = 0;
+	wchar_t *level_name = *(wchar_t **)(a2 + 0x1C);
+	WCharToChar(GetData()->level, level_name);
+	LevelLoadOriginal(this_, a2, a3);
+
+	static_load = false;
+
+	return 1;
+}
+
+/* __declspec(naked) void LevelLoadHook() {
 	static wchar_t *level_name;
 
 	__asm {
+		push 0xFFFFFFFF
 		push eax
 		push ebx
 		push ecx
@@ -215,7 +234,7 @@ __declspec(naked) void LevelLoadHook() {
 	}
 
 	static_load = true;
-	beamer = kg = strang = false;
+	/* beamer = kg = strang = false;
 	GetData()->player_base = (DWORD)zero;
 	GetData()->camera_base = (DWORD)zero;
 	GetData()->top_speed = 0;
@@ -232,28 +251,13 @@ __declspec(naked) void LevelLoadHook() {
 		pop eax
 		jmp LevelLoadOriginal
 	}
-}
-
-__declspec(naked) void LevelLoadFinish() {
-	static_load = false;
-	__asm {
-		pop ecx
-		pop edi
-		pop esi
-		pop ebp
-		pop ebx
-		add esp, 0xD0
-		retn 0xC
-	}
-}
+} */
 
 void **__fastcall DebugPrintHook(void **this_, void *idle_, void *src) {
-	static wchar_t a[1] = { L'\n' };
-
 	if (engine_console && src) {
 		if (!wcsempty((wchar_t *)src) && !wcsstr((wchar_t *)src, L"..\\TdGame\\Config\\TdEngine.ini") && !wcsstr((wchar_t *)src, L"Engine.ISVHacks") && !wcsstr((wchar_t *)src, L"UseMinimalNVIDIADriverShaderOptimization") && !wcsstr((wchar_t *)src, L"CanvasObject")) {
 			WriteConsole(engine_console, (wchar_t *)src, wcslen((wchar_t *)src), NULL, NULL);
-			WriteConsole(engine_console, a, 1, NULL, NULL);
+			WriteConsole(engine_console, L"\n", 1, NULL, NULL);
 		}
 	}
 
@@ -329,6 +333,27 @@ bool Loading() {
 	return static_load || ReadInt(GetCurrentProcess(), (void *)loading_addr) == 0;
 }
 
+// Work around for Fatalis's autosplitter
+void ReHookListener() {
+	for (;;) {
+		if (*(unsigned char *)LevelLoadBase == 0xE9) {
+			TrampolineHook(LevelLoadHook, (void *)LevelLoadBase, (void **)&LevelLoadOriginal);
+			return;
+		}
+
+		Sleep(1);
+	}
+}
+
+HMODULE WINAPI LoadLibraryAHook(char *module) {
+	if (strstr(module, "menl_hooks.dll")) {
+		UnTrampolineHook((void *)LevelLoadBase, (void **)&LevelLoadOriginal);
+		CreateThread(0, 0, (LPTHREAD_START_ROUTINE)ReHookListener, 0, 0, 0);
+	}
+
+	return LoadLibraryAOriginal(module);
+}
+
 void SetupEngine() {
 	DWORD addr;
 
@@ -338,18 +363,26 @@ void SetupEngine() {
 	fall_effect_base = (DWORD)FindPattern((void *)((DWORD)GetModuleHandle(0)), 0x12800000, "\x89\x0D\x00\x00\x00\x00\xB9\x00\x00\x00\x00\xFF", "xx????x????x");
 	fall_effect_base = *(DWORD *)(fall_effect_base + 0x2);
 
-	addr = 0xEF90C0;
+	// addr = 0xEF90C0;
+	addr = (DWORD)FindPattern((void *)((DWORD)GetModuleHandle(0)), 0x12800000, "\x56\x8B\xF1\x8B\x06\x8B\x90\x34\x01\x00\x00\xFF\xD2\xD8\x8E\xD8\x0C\x00\x00\x5E\xC3", "xxxxxxxxxxxxxxxxxxxxx");
 	TrampolineHook(GetEngineBaseHook, (void *)addr, (void **)&GetEngineBaseOriginal);
 
 	addr = (DWORD)FindPattern((void *)((DWORD)GetModuleHandle(0)), 0x12800000, "\x81\xEC\x8C\x00\x00\x00\x53\x56\x8B\xF1\x8B\x8E\xCC\x01\x00\x00\x8B\x81\xD0\x02\x00\x00\x8B\x90\xF8\x04\x00\x00\x05\xF8\x04\x00\x00\x89\x54\x24\x08\x8B\x50\x04\x89\x54\x24\x0C\x8B\x40\x08\x89\x44\x24\x10\x8B\x81\xD0\x02\x00\x00\x8B\x88\x04\x05\x00\x00\x05\x04\x05\x00\x00\x89\x4C\x24\x6C\x8B\x50\x04\x57\x8D\x4C\x24\x64\x89\x54\x24\x74\x8B\x40\x08\x51\x8D\x4C\x24\x74\x89\x44\x24\x7C", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 	TrampolineHook(UpdateEngineHook, (void *)addr, (void **)&UpdateEngineOriginal);
 
-	addr = 0x11C6B8E;
+	// addr = 0x11C6A70;
+	addr = (DWORD)FindPattern((void *)((DWORD)GetModuleHandle(0)), 0x12800000, "\x33\xC4\x50\x8D\x84\x24\xD8\x00\x00\x00\x64\xA3\x00\x00\x00\x00\x8B\xE9\x89\x6C\x24\x30\x33\xFF\x89\x7C\x24\x4C\x89\x7C\x24\x50\x89\x7C\x24\x54\x89\xBC\x24\xE0\x00\x00\x00\x89\xBC\x24\x9C\x00\x00\x00\x89\xBC\x24\xA0\x00\x00\x00\x89\xBC\x24\xA4\x00\x00\x00", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx") - 0x1D;
+	LevelLoadBase = addr;
+	TrampolineHook(LevelLoadHook, (void *)addr, (void **)&LevelLoadOriginal);
+
+	/* addr = 0x11C6B8E;
 	TrampolineHook(LevelLoadHook, (void *)addr, (void **)&LevelLoadOriginal);
 
 	addr = 0x11C7F06;
-	SetJMP(LevelLoadFinish, (void *)addr, 0);
+	SetJMP(LevelLoadFinish, (void *)addr, 0); */
 
 	addr = 0x40AEB0;
 	TrampolineHook(DebugPrintHook, (void *)addr, (void **)&DebugPrintOriginal);
+
+	TrampolineHook(LoadLibraryAHook, LoadLibraryA, (void **)&LoadLibraryAOriginal);
 }
